@@ -1,2 +1,7 @@
 # Project exclude paths
 /out/
+/cpen502.iml
+/.idea/
+/config/
+/robocode/
+/robots/
