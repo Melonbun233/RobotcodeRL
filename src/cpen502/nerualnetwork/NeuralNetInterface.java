@@ -1,8 +1,9 @@
-package cpen502.robots;
+package cpen502.nerualnetwork;
 
 public interface NeuralNetInterface {
 
-    final double bias = 1.0; // The input for each neurons bias weight
+    // The input for each neurons bias weight
+    final double bias = 1.0;
     /**
      * Constructor. (Cannot be declared in an interface, but your implementation will need one)
      * @param argNumInputs The number of inputs in your input vector
@@ -23,14 +24,16 @@ public interface NeuralNetInterface {
      */
 
     /**
-     * Return a bipolar sigmoid of the input X * @param x The input
+     * Return a bipolar sigmoid of the input X.
+     * @param x The input
      * @return f(x) = 2 / (1+e(-x)) - 1
      */
 
     public double sigmoid(double x);
 
     /**
-     * This method implements a general sigmoid * @param x The input
+     * This method implements a general sigmoid.
+     * @param x The input
      * @return f(x) = b_minus_a / (1 + e(-x)) - */
 
     public double customSigmoid(double x);
