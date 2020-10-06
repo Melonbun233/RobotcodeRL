@@ -7,52 +7,30 @@ import java.util.function.Function;
  * The Neuron is the smallest component in a neural network.
  */
 public class Neuron {
-    final NeuralLayer parentLayer; // The neural layer that has this neuron.
     final int neuronIndex; // Position index in this layer.
-    final NeuronType type; // Input, Output, or Hidden.
-
-    final Function<Double, Double> activationFunc;
-    final Function<Double, Double> activationDerivativeFunc;
-
-    double momentum;
-    double learningRate;
 
     double lastInput;
     double lastOutput;
-    double lastError;
 
     /**
      * Construct a neuron in a neural layer.
-     * @param type The type of this nuron.
-     * @param activationFunc The activation function used to compute the output.
-     * @param activationDerivativeFunc The derivative of the activation function.
-     * @param momentum The momentum used to accelerate the training process.
-     * @param learningRate The learning rate used when update the weights.
      * @param neuronIndex The index of this neuron's position in the neural layer.
-     * @param parentLayer The neural layer that includes this neuron.
      */
-    public Neuron(NeuronType type, Function<Double, Double> activationFunc,
-                  Function<Double, Double> activationDerivativeFunc, double momentum,
-                  double learningRate, int neuronIndex, NeuralLayer parentLayer) {
-        this.type = type;
-        this.activationFunc = activationFunc;
-        this.activationDerivativeFunc = activationDerivativeFunc;
-        this.momentum = momentum;
-        this.learningRate = learningRate;
+    public Neuron(int neuronIndex) {
         this.neuronIndex = neuronIndex;
-        this.parentLayer = parentLayer;
     }
 
     /**
      * This function should be called during the forward propagation process.
      * Compute the output based on the input value using the activation function.
      * Also store the output in this neuron.
+     * @param func The activation function.
      * @param input The input is calculated as: dotProduct(prevLayerWeights, preLayerOutputs)
      * @return The computed output.
      */
-    public double activate(double input) {
+    public double forwardPropagate(Function<Double, Double> func, double input) {
         lastInput = input;
-        lastOutput = activationFunc.apply(input);
+        lastOutput = func.apply(input);
         return lastOutput;
     }
 
@@ -60,13 +38,16 @@ public class Neuron {
      * This function should be called during the backward propagation process.
      * Compute the error based on the weighted error sum of the next layer.
      * Also store the error in this neuron.
-     * @param weightedErrorSum The weighted error sum of the next layer. It is computed as:
-     *                         sum(nextLayerWeights .* nextLayerErrors)
+     * @param func The derivative of the activation function used on this neuron.
+     * @param input The error from the next layer.
+     *              If this neuron is at output layer:
+     *                  input = expectedOutput - actualOutput
+     *              Otherwise:
+     *                  input = sum(nextLayerWeights .* nextLayerErrors)
      * @return The computed error.
      */
-    public double updateError(double weightedErrorSum) {
-        lastError = weightedErrorSum * activationDerivativeFunc.apply(lastOutput);
-        return lastError;
+    public double backwardPropagate(Function<Double, Double> func, double input) {
+        return input * func.apply(lastOutput);
     }
 
 }
