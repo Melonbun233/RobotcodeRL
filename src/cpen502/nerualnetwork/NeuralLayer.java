@@ -2,6 +2,7 @@ package cpen502.nerualnetwork;
 
 import org.apache.commons.math3.linear.BlockRealMatrix;
 
+import java.util.Arrays;
 import java.util.function.Function;
 
 /**
@@ -29,7 +30,6 @@ public class NeuralLayer {
 
     final double momentum;
     final double learningRate;
-    double bias;
 
     final Neuron[] neurons;
     final int neuronNum;
@@ -39,7 +39,7 @@ public class NeuralLayer {
      * The neurons are constructed from arrays of neuron types, activation functions and their
      * derivatives, momentums, learning rates.
      * @param type This layer's neurons' types
-     * @param neurons All neurons in this layer.
+     * @param neuronNum Neuron number in this layer
      * @param activationFunc The activation function used to compute the output.
      * @param activationDerivativeFunc The derivative of the activation function.
      * @param momentum The momentum used to accelerate the training process.
@@ -49,21 +49,34 @@ public class NeuralLayer {
      * @throws Exception If the lengths of the arrays used to construct neurons are not the same,
      *                   throws an exception.
      */
-    public NeuralLayer(NeuralLayerType type, Neuron[] neurons,
+    public NeuralLayer(NeuralLayerType type, int neuronNum,
                        Function<Double, Double> activationFunc,
                        Function<Double,Double> activationDerivativeFunc,
-                       double momentum, double learningRate, double bias,
+                       double momentum, double learningRate,
                        NeuralNetwork network, int layerIndex){
-        this.neurons = neurons;
         this.activationFunc = activationFunc;
         this.activationDerivativeFunc = activationDerivativeFunc;
         this.momentum = momentum;
         this.learningRate = learningRate;
-        this.bias = bias;
-        this.neuronNum = neurons.length;
         this.type = type;
         this.layerIndex = layerIndex;
         this.network = network;
+        this.neuronNum = neuronNum;
+
+        if (type != NeuralLayerType.Output) {
+            neurons = new Neuron[neuronNum + 1];
+        } else {
+            neurons = new Neuron[neuronNum];
+        }
+
+        for (int i = 0; i < neurons.length; i ++) {
+            neurons[i] = new Neuron(i);
+        }
+
+        if (type != NeuralLayerType.Output) {
+            neurons[neuronNum].lastInput = 1;
+            neurons[neuronNum].lastOutput = 1;
+        }
     }
 
     /**
@@ -74,14 +87,18 @@ public class NeuralLayer {
      * @param input A input vector which is the output of previous layer's forward propagation.
      * @return The output is a vector with size of neuronNum
      */
-    public double[] forwardPropagate(BlockRealMatrix weight, double[] input, double[] biasWeight) {
-        double[] output = input.clone();
-        output = this.type == NeuralLayerType.Input ? output : weight.operate(output);
+    public double[] forwardPropagate(BlockRealMatrix weight, double[] input) {
+        double[] output;
+        if (this.type != NeuralLayerType.Input) {
+            output = Arrays.copyOf(input, input.length + 1);
+            output[output.length - 1] = network.bias;
+            output = weight.operate(output);
+        } else {
+            output = input.clone();
+        }
 
-        // Sum of lower levels output * weight
         for (int i = 0; i < output.length; i ++) {
-            output[i] = neurons[i].forwardPropagate(activationFunc,
-                    this.type == NeuralLayerType.Input ? output[i] : output[i] + bias * biasWeight[i]);
+            output[i] = neurons[i].forwardPropagate(activationFunc, output[i]);
         }
 
         return output;
@@ -96,31 +113,32 @@ public class NeuralLayer {
      * @param input A input vector of size [nextLayerNeuron#]
      * @return  The output is a vector with size of neuronNum
      */
-    public double[] backwardPropagate(BlockRealMatrix weight, BlockRealMatrix weightDelta,
-                                      double[] input, double[] biasWeight, double[] biasWeightDelta) {
-        // Calculate sum of errors
-        double[] output = input.clone();
-        output = this.type == NeuralLayerType.Output ? output : weight.transpose().operate(output);
-
+    public double[] backwardPropagate(BlockRealMatrix weight, BlockRealMatrix weightDelta, double[] input) {
         // sum of higher layers error * weight
-        for (int i = 0; i < output.length; i ++) {
+        double[] output = input.clone();
+        if (this.type != NeuralLayerType.Output) {
+            output = weight.transpose().operate(output);
+        }
+
+        for (int i = 0; i < neurons.length; i ++) {
             output[i] = neurons[i].backwardPropagate(activationDerivativeFunc, output[i]);
         }
 
-        // Update weight matrix delta
+        // Update weight matrix
         if (this.type != NeuralLayerType.Output) {
             for (int i = 0; i < weight.getRowDimension(); i ++) {
-                double delta = momentum * biasWeightDelta[i] + learningRate * input[i];
-                biasWeight[i] += delta;
-                biasWeightDelta[i] = delta;
+                // Delta for neurons
                 for (int j = 0; j < weight.getColumnDimension(); j++) {
                     // Note //
-                    delta = learningRate * input[i] * neurons[j].lastOutput + // error
+                    double delta = learningRate * input[i] * neurons[j].lastOutput + // error
                             momentum * weightDelta.getEntry(i, j); // momentum
                     weight.setEntry(i, j, weight.getEntry(i, j) + delta); // momentum
                     weightDelta.setEntry(i, j, delta);
                 }
             }
+
+            // Get rid of bias turn
+            output = Arrays.copyOf(output, output.length-1);
         }
 
         return output;

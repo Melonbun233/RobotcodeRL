@@ -30,9 +30,9 @@ public class XORNeuralNetwork {
 
     public static void main(String[] args) {
         boolean useBipolar = true;
-        int runNum = 10;
+        int runNum = 1;
 
-        List<Neuron[]> neuronList = Utilities.generateNeuronList(new int[]{2, 4, 1});
+        int[] nueronNums = new int[]{2, 4, 1};
 
         Function<Double, Double>[] activationFuncs = new Function[3];
         Arrays.fill(activationFuncs, useBipolar ?
@@ -48,7 +48,7 @@ public class XORNeuralNetwork {
         // Initialize neural network
         NeuralNetwork neuralnet;
         try {
-            neuralnet = new NeuralNetwork(neuronList, activationFuncs, activationDerivativeFuncs,
+            neuralnet = new NeuralNetwork(nueronNums, activationFuncs, activationDerivativeFuncs,
                     momentums, learningRates);
         } catch (Exception e) {
             e.printStackTrace();
@@ -69,11 +69,11 @@ public class XORNeuralNetwork {
 
         for (int run = 0; run < runNum; run ++) {
 
-            Writer writer = null;
-            try {
-                writer = new BufferedWriter(new OutputStreamWriter(
-                        new FileOutputStream("trail-" + run + useBipolarStr + ".txt"),
-                        "utf-8"));
+//            Writer writer = null;
+//            try {
+//                writer = new BufferedWriter(new OutputStreamWriter(
+//                        new FileOutputStream("trail-" + run + useBipolarStr + ".txt"),
+//                        "utf-8"));
 
                 neuralnet.initializeWeights();
                 epochNum = 0;
@@ -93,29 +93,29 @@ public class XORNeuralNetwork {
                     epochNum++;
                     totalEpochNum++;
 
-                    if (epochNum > 1000000) {
+                    if (epochNum > 10000000) {
                         System.out.println("Exceeding max epoch nums");
-                        totalEpochNum -= 1000000;
+                        totalEpochNum -= 10000000;
                         run--;
                         break;
                     }
-                    writer.write(epochNum + "," + totalError + "\n");
-                    // System.out.println("Total Error of Epoch " + epochNum + ": " + totalError);
+//                    writer.write(epochNum + "," + totalError + "\n");
+                    System.out.println("Total Error of Epoch " + epochNum + ": " + totalError);
                 }
                 //writer.write("Run " + run + " ended with " + epochNum + "\n");
                 System.out.println("Run " + run + " ended with " + epochNum);
 
-                writer.close();
-            } catch (UnsupportedEncodingException e) {
-                e.printStackTrace();
-                break;
-            } catch (FileNotFoundException e) {
-                e.printStackTrace();
-                break;
-            } catch (IOException e) {
-                e.printStackTrace();
-                break;
-            }
+//                writer.close();
+//            } catch (UnsupportedEncodingException e) {
+//                e.printStackTrace();
+//                break;
+//            } catch (FileNotFoundException e) {
+//                e.printStackTrace();
+//                break;
+//            } catch (IOException e) {
+//                e.printStackTrace();
+//                break;
+//            }
 
         }
 

@@ -29,16 +29,13 @@ public class NeuralNetwork{
     final BlockRealMatrix[] weights;
     final BlockRealMatrix[] weightDeltas;
 
-    final List<double[]> biasWeights;
-    final List<double[]> biasWeightDeltas;
-
     private final Random random = new Random();
 
-    public NeuralNetwork (List<Neuron[]> neuronList, Function<Double, Double>[] activationFuncs,
+    public NeuralNetwork (int[] neuronNums, Function<Double, Double>[] activationFuncs,
                           Function<Double, Double>[] activationDerivativeFuncs,
                           double[] momentums, double[] learningRates) throws Exception {
         // Validate parameters
-        layerNum = neuronList.size();
+        layerNum = neuronNums.length;
         if (activationFuncs.length != layerNum || activationDerivativeFuncs.length != layerNum ||
             momentums.length != layerNum || learningRates.length != layerNum) {
             throw new Exception("Lists of parameters don't agree on sizes");
@@ -52,17 +49,17 @@ public class NeuralNetwork{
 
         // Construct neural layers
         // First layer is input layer
-        layers[0] = new NeuralLayer(NeuralLayerType.Input, neuronList.get(0),
+        layers[0] = new NeuralLayer(NeuralLayerType.Input, neuronNums[0],
                 activationFuncs[0], activationDerivativeFuncs[0],
-                momentums[0], learningRates[0], bias, this, 0);
+                momentums[0], learningRates[0], this, 0);
         // Last layer is output layer
-        layers[layerNum-1] = new NeuralLayer(NeuralLayerType.Output, neuronList.get(layerNum-1),
+        layers[layerNum-1] = new NeuralLayer(NeuralLayerType.Output, neuronNums[layerNum-1],
                 activationFuncs[layerNum-1], activationDerivativeFuncs[layerNum-1],
-                momentums[layerNum-1], learningRates[layerNum-1], bias, this, 0);
-        for (int i = 1; i < neuronList.size() - 1; i ++) {
-                layers[i] = new NeuralLayer(NeuralLayerType.Hidden, neuronList.get(i),
+                momentums[layerNum-1], learningRates[layerNum-1], this, 0);
+        for (int i = 1; i < neuronNums.length - 1; i ++) {
+                layers[i] = new NeuralLayer(NeuralLayerType.Hidden, neuronNums[i],
                         activationFuncs[i], activationDerivativeFuncs[i],
-                        momentums[i], learningRates[i], bias, this, i);
+                        momentums[i], learningRates[i], this, i);
         }
 
         // Construct weights and biases
@@ -70,14 +67,9 @@ public class NeuralNetwork{
         weights = new BlockRealMatrix[layerNum-1];
         weightDeltas = new BlockRealMatrix[layerNum-1];
 
-        biasWeights = new ArrayList<>();
-        biasWeightDeltas = new ArrayList<>();
-
         for (int i = 0; i < weights.length; i ++) {
-            weights[i] = new BlockRealMatrix(layers[i+1].neuronNum, layers[i].neuronNum);
-            weightDeltas[i] = new BlockRealMatrix(layers[i+1].neuronNum, layers[i].neuronNum);
-            biasWeights.add(new double[layers[i+1].neuronNum]);
-            biasWeightDeltas.add(new double[layers[i+1].neuronNum]);
+            weights[i] = new BlockRealMatrix(layers[i+1].neuronNum, layers[i].neuronNum + 1);
+            weightDeltas[i] = new BlockRealMatrix(layers[i+1].neuronNum, layers[i].neuronNum + 1);
         }
     }
 
@@ -120,10 +112,12 @@ public class NeuralNetwork{
      * @return A vector from last layer of size [lastLayerNeuron#]
      */
     private double[] forwardPropagation(double[] input) {
-        double[] output = layers[0].forwardPropagate(null, input, null);
+        double[] output = layers[0].forwardPropagate(null, input);
+
         for (int i = 0; i < weights.length; i ++) {
-            output = layers[i+1].forwardPropagate(weights[i], output, biasWeights.get(i));
+            output = layers[i+1].forwardPropagate(weights[i], output);
         }
+
         return output;
     }
 
@@ -135,12 +129,10 @@ public class NeuralNetwork{
      *              and y_i is the actual output.
      */
     private void backwardPropagation(double[] input) {
-        double[] output = layers[layerNum-1].backwardPropagate(null, null,
-                input, null, null);
+        double[] output = layers[layerNum-1].backwardPropagate(null, null, input);
 
         for (int i = weights.length - 1; i >= 0; i --) {
-            output = layers[i].backwardPropagate(weights[i], weightDeltas[i], output,
-                    biasWeights.get(i), biasWeightDeltas.get(i));
+            output = layers[i].backwardPropagate(weights[i], weightDeltas[i], output);
         }
     }
 
@@ -148,8 +140,6 @@ public class NeuralNetwork{
     public void initializeWeights() {
         for (int i = 0; i < weights.length; i ++) {
             for (int row = 0; row < weights[i].getRowDimension(); row ++) {
-                biasWeights.get(i)[row] = random.nextDouble() - 0.5;
-                biasWeightDeltas.get(i)[row] = 0;
                 for (int column = 0; column < weights[i].getColumnDimension(); column ++) {
                     weights[i].setEntry(row, column, random.nextDouble() - 0.5);
                     weightDeltas[i].setEntry(row, column, 0);
@@ -161,8 +151,6 @@ public class NeuralNetwork{
     public void zeroWeights() {
         for (int i = 0; i < weights.length; i ++) {
             for (int row = 0; row < weights[i].getRowDimension(); row ++) {
-                biasWeights.get(i)[row] = 0;
-                biasWeightDeltas.get(i)[row] = 0;
                 for (int column = 0; column < weights[i].getColumnDimension(); column ++) {
                     weights[i].setEntry(row, column, 0);
                     weightDeltas[i].setEntry(row, column, 0);
