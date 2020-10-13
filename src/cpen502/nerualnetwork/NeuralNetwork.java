@@ -3,14 +3,9 @@ package cpen502.nerualnetwork;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
 import java.util.function.Function;
-
-import cpen502.nerualnetwork.NeuralLayer.NeuralLayerType;
-import org.apache.commons.math3.linear.BlockRealMatrix;
-import sun.jvm.hotspot.opto.Block;
 
 /**
  * Neural network class that implements CommonInterface
@@ -21,55 +16,53 @@ import sun.jvm.hotspot.opto.Block;
  */
 public class NeuralNetwork{
     final double bias = 1.0;
-
     final static int MIN_NEURAL_LAYER_NUM = 2;
-    final NeuralLayer[] layers;
+    final Random random = new Random();
+
     final int layerNum;
+    final int[] neuronNums;
+    final List<double[][]> weights;
+    final List<double[][]> weightDeltas;
+    final List<double[][]> weightCorrections;
 
-    final BlockRealMatrix[] weights;
-    final BlockRealMatrix[] weightDeltas;
+    final List<double[]> neuronOutputs;
+    final List<double[]> neuronDeltas;
 
-    private final Random random = new Random();
+    final double momentum;
+    final double learningRate;
 
-    public NeuralNetwork (int[] neuronNums, Function<Double, Double>[] activationFuncs,
-                          Function<Double, Double>[] activationDerivativeFuncs,
-                          double[] momentums, double[] learningRates) throws Exception {
-        // Validate parameters
+    final Function<Double, Double> activationFunction;
+    final Function<Double, Double> activationDerivativeFunction;
+
+    public NeuralNetwork (int[] neuronNums, Function<Double, Double> activationFunction,
+                          Function<Double, Double> activationDerivativeFunction,
+                          double momentum, double learningRate) throws Exception {
+        if (neuronNums.length < MIN_NEURAL_LAYER_NUM) {
+            throw new Exception("Neural Network must have at least " + MIN_NEURAL_LAYER_NUM + " layers");
+        }
         layerNum = neuronNums.length;
-        if (activationFuncs.length != layerNum || activationDerivativeFuncs.length != layerNum ||
-            momentums.length != layerNum || learningRates.length != layerNum) {
-            throw new Exception("Lists of parameters don't agree on sizes");
+        this.neuronNums = neuronNums;
+        this.activationFunction = activationFunction;
+        this.activationDerivativeFunction = activationDerivativeFunction;
+        this.momentum = momentum;
+        this.learningRate = learningRate;
+
+        // create all weights
+        this.weights = new ArrayList<>();
+        this.weightDeltas = new ArrayList<>();
+        this.weightCorrections = new ArrayList<>();
+        for (int i = 0; i < layerNum - 1; i ++) {
+            this.weights.add(new double [neuronNums[i] + 1][neuronNums[i+1]]);
+            this.weightDeltas.add(new double [neuronNums[i] + 1][neuronNums[i+1]]);
+            this.weightCorrections.add(new double [neuronNums[i] + 1][neuronNums[i+1]]);
         }
 
-        if (layerNum < MIN_NEURAL_LAYER_NUM) {
-            throw new Exception("There should be at least 2 layers in a neural network");
-        }
-
-        layers = new NeuralLayer[layerNum];
-
-        // Construct neural layers
-        // First layer is input layer
-        layers[0] = new NeuralLayer(NeuralLayerType.Input, neuronNums[0],
-                activationFuncs[0], activationDerivativeFuncs[0],
-                momentums[0], learningRates[0], this, 0);
-        // Last layer is output layer
-        layers[layerNum-1] = new NeuralLayer(NeuralLayerType.Output, neuronNums[layerNum-1],
-                activationFuncs[layerNum-1], activationDerivativeFuncs[layerNum-1],
-                momentums[layerNum-1], learningRates[layerNum-1], this, 0);
-        for (int i = 1; i < neuronNums.length - 1; i ++) {
-                layers[i] = new NeuralLayer(NeuralLayerType.Hidden, neuronNums[i],
-                        activationFuncs[i], activationDerivativeFuncs[i],
-                        momentums[i], learningRates[i], this, i);
-        }
-
-        // Construct weights and biases
-        // Weights are matrices between each layers
-        weights = new BlockRealMatrix[layerNum-1];
-        weightDeltas = new BlockRealMatrix[layerNum-1];
-
-        for (int i = 0; i < weights.length; i ++) {
-            weights[i] = new BlockRealMatrix(layers[i+1].neuronNum, layers[i].neuronNum + 1);
-            weightDeltas[i] = new BlockRealMatrix(layers[i+1].neuronNum, layers[i].neuronNum + 1);
+        // cache to remember the last output
+        this.neuronOutputs = new ArrayList<>();
+        this.neuronDeltas = new ArrayList<>();
+        for (int i = 0; i < layerNum; i ++) {
+            this.neuronOutputs.add(new double[neuronNums[i]]);
+            this.neuronDeltas.add(new double[neuronNums[i]]);
         }
     }
 
@@ -85,7 +78,7 @@ public class NeuralNetwork{
     public double[] train(double[] X, double[] argValue) {
         double[] output = forwardPropagation(X);
 
-        double[] input = new double[argValue.length];
+        double[] input = new double[output.length];
         for (int i = 0; i < input.length; i ++) {
             input[i] = argValue[i] - output[i];
         }
@@ -111,13 +104,42 @@ public class NeuralNetwork{
      * @param input A vector of size [firstLayerNeuron#]
      * @return A vector from last layer of size [lastLayerNeuron#]
      */
-    private double[] forwardPropagation(double[] input) {
-        double[] output = layers[0].forwardPropagate(null, input);
-
-        for (int i = 0; i < weights.length; i ++) {
-            output = layers[i+1].forwardPropagate(weights[i], output);
+    double[] forwardPropagation(double[] input) {
+        // process through the input layer
+        double[] output = input.clone();
+        for (int i = 0; i < input.length; i ++) {
+            // output[i] = activationFunction.apply(input[i]);
+            neuronOutputs.get(0)[i] = output[i];
         }
 
+
+        // process through the hidden layers and output layers
+        for (int i = 1; i < layerNum; i ++) {
+            double[][] weight = weights.get(i-1);
+            double[] neuronOutput = neuronOutputs.get(i);
+
+            double[] nextOutput = new double[neuronNums[i]];
+
+            for (int outputIndex = 0; outputIndex < neuronNums[i]; outputIndex ++) {
+                // weight sum
+                for (int inputIndex = 0; inputIndex < weight.length; inputIndex ++) {
+                    // bias neuron
+                    if (inputIndex == weight.length - 1){
+                        nextOutput[outputIndex] += weight[inputIndex][outputIndex] * bias;
+                    } else {
+                        nextOutput[outputIndex] += weight[inputIndex][outputIndex] * output[inputIndex];
+                    }
+                }
+                // activate
+                nextOutput[outputIndex] = activationFunction.apply(nextOutput[outputIndex]);
+                // cache output
+                neuronOutput[outputIndex] = nextOutput[outputIndex];
+            }
+
+            output = nextOutput;
+        }
+
+        // output
         return output;
     }
 
@@ -128,32 +150,93 @@ public class NeuralNetwork{
      *              Each element of the vector is (C_i - y_i), where C_i is the expected output,
      *              and y_i is the actual output.
      */
-    private void backwardPropagation(double[] input) {
-        double[] output = layers[layerNum-1].backwardPropagate(null, null, input);
+    void backwardPropagation(double[] input) {
+        // process through the output layer and hidden layers
+        for (int i = layerNum - 1; i >= 1; i --) {
+            double[][] weight = i == layerNum - 1 ? null : weights.get(i); // use weight above this layer
+            double[][] weightCorrection = weightCorrections.get(i-1); // correct weight below this layer
+            double[] neuronDelta = neuronDeltas.get(i);
+            double[] nextNeuronDelta = i == layerNum - 1 ? null : neuronDeltas.get(i+1);
+            double[] neuronOutput = neuronOutputs.get(i);
+            double[] prevNeuronOutput = neuronOutputs.get(i-1);
 
-        for (int i = weights.length - 1; i >= 0; i --) {
-            output = layers[i].backwardPropagate(weights[i], weightDeltas[i], output);
+            for (int neuronIndex = 0; neuronIndex < neuronNums[i]; neuronIndex ++) {
+                // calculate deltas for this layer's neurons
+                neuronDelta[neuronIndex] = 0;
+                if (i == layerNum - 1) {
+                    // output layer delta
+                    neuronDelta[neuronIndex] = input[neuronIndex] *
+                            activationDerivativeFunction.apply(neuronOutput[neuronIndex]);
+                } else {
+                    // hidden layers, sum the weighted next layer delta
+                    for (int nextNeuronIndex = 0; nextNeuronIndex < neuronNums[i+1]; nextNeuronIndex ++) {
+                        neuronDelta[neuronIndex] += nextNeuronDelta[nextNeuronIndex] *
+                                weight[neuronIndex][nextNeuronIndex];
+                    }
+                    neuronDelta[neuronIndex] *= activationDerivativeFunction.apply(neuronOutput[neuronIndex]);
+                }
+
+                // calculate weight correction terms
+                for (int weightIndex = 0; weightIndex < weightCorrection.length; weightIndex ++) {
+                    // bias neuron
+                    if (weightIndex == weightCorrection.length - 1) {
+                        weightCorrection[weightIndex][neuronIndex] = learningRate * neuronDelta[neuronIndex];
+                    } else {
+                        weightCorrection[weightIndex][neuronIndex] =
+                                learningRate * neuronDelta[neuronIndex] * prevNeuronOutput[weightIndex];
+                    }
+                }
+            }
+//            // try update weight here
+//            weight = weights.get(i-1);
+//            double[][] weightDelta = weightDeltas.get(i-1);
+//            for (int row = 0; row < weight.length; row ++) {
+//                for (int column = 0; column < weight[0].length; column ++) {
+//                    double delta = weightCorrection[row][column] + momentum * weightDelta[row][column];
+//                    weight[row][column] += delta;
+//                    weightDelta[row][column] = delta;
+//                }
+//            }
+        }
+
+        // update weights
+        for (int i = 0; i < weights.size(); i ++) {
+            double[][] weight = weights.get(i);
+            double[][] weightDelta = weightDeltas.get(i);
+            double[][] weightCorrection = weightCorrections.get(i);
+            for (int row = 0; row < weight.length; row ++) {
+                for (int column = 0; column < weight[0].length; column ++) {
+                    double delta = weightCorrection[row][column] + momentum * weightDelta[row][column];
+                    weight[row][column] += delta;
+                    weightDelta[row][column] = delta;
+                    weightCorrection[row][column] = 0;
+                }
+            }
         }
     }
 
 
     public void initializeWeights() {
-        for (int i = 0; i < weights.length; i ++) {
-            for (int row = 0; row < weights[i].getRowDimension(); row ++) {
-                for (int column = 0; column < weights[i].getColumnDimension(); column ++) {
-                    weights[i].setEntry(row, column, random.nextDouble() - 0.5);
-                    weightDeltas[i].setEntry(row, column, 0);
+        for (int i = 0; i < weights.size(); i ++) {
+            double[][] weight = weights.get(i);
+            double[][] weightDelta = weightDeltas.get(i);
+            for (int row = 0; row < weight.length; row ++) {
+                for (int column = 0; column < weight[0].length; column ++) {
+                    weight[row][column] = random.nextDouble() - 0.5;
+                    weightDelta[row][column] = 0;
                 }
             }
         }
     }
 
     public void zeroWeights() {
-        for (int i = 0; i < weights.length; i ++) {
-            for (int row = 0; row < weights[i].getRowDimension(); row ++) {
-                for (int column = 0; column < weights[i].getColumnDimension(); column ++) {
-                    weights[i].setEntry(row, column, 0);
-                    weightDeltas[i].setEntry(row, column, 0);
+        for (int i = 0; i < weights.size(); i ++) {
+            double[][] weight = weights.get(i);
+            double[][] weightDelta = weightDeltas.get(i);
+            for (int row = 0; row < weight.length; row ++) {
+                for (int column = 0; column < weight[0].length; column ++) {
+                    weight[row][column] = 0;
+                    weightDelta[row][column] = 0;
                 }
             }
         }

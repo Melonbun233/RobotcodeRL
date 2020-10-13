@@ -1,13 +1,11 @@
 package cpen502.models;
 
 import cpen502.nerualnetwork.NeuralNetwork;
-import cpen502.nerualnetwork.Neuron;
 import cpen502.utils.Functions;
 import cpen502.utils.Utilities;
 
 import java.io.*;
 import java.util.Arrays;
-import java.util.List;
 import java.util.function.Function;
 
 public class XORNeuralNetwork {
@@ -30,26 +28,23 @@ public class XORNeuralNetwork {
 
     public static void main(String[] args) {
         boolean useBipolar = true;
-        int runNum = 1;
+        int runNum = 10;
 
         int[] nueronNums = new int[]{2, 4, 1};
 
-        Function<Double, Double>[] activationFuncs = new Function[3];
-        Arrays.fill(activationFuncs, useBipolar ?
-                Functions.sigmoidBipolar : Functions.sigmoidBinary);
+        Function<Double, Double> activationFunction = useBipolar ?
+                Functions.sigmoidBipolar : Functions.sigmoidBinary;
+        Function<Double, Double> activationDerivativeFunction = useBipolar ?
+                Functions.sigmoidDerivativeBipolar : Functions.sigmoidDerivativeBinary;
 
-        Function<Double, Double>[] activationDerivativeFuncs = new Function[3];
-        Arrays.fill(activationDerivativeFuncs, useBipolar ?
-                Functions.sigmoidDerivativeBipolar : Functions.sigmoidDerivativeBinary);
-
-        double[] momentums = new double[] {0.9 , 0.9, 0.9};
-        double[] learningRates = new double[] {0.02, 0.02, 0.02};
+        double momentums = 0.9;
+        double learningRates = 0.2;
 
         // Initialize neural network
         NeuralNetwork neuralnet;
         try {
-            neuralnet = new NeuralNetwork(nueronNums, activationFuncs, activationDerivativeFuncs,
-                    momentums, learningRates);
+            neuralnet = new NeuralNetwork(nueronNums, activationFunction,
+                    activationDerivativeFunction, momentums, learningRates);
         } catch (Exception e) {
             e.printStackTrace();
             return;
@@ -69,11 +64,11 @@ public class XORNeuralNetwork {
 
         for (int run = 0; run < runNum; run ++) {
 
-//            Writer writer = null;
-//            try {
-//                writer = new BufferedWriter(new OutputStreamWriter(
-//                        new FileOutputStream("trail-" + run + useBipolarStr + ".txt"),
-//                        "utf-8"));
+            Writer writer = null;
+            try {
+                writer = new BufferedWriter(new OutputStreamWriter(
+                        new FileOutputStream("trail-" + run + useBipolarStr + ".txt"),
+                        "utf-8"));
 
                 neuralnet.initializeWeights();
                 epochNum = 0;
@@ -93,32 +88,30 @@ public class XORNeuralNetwork {
                     epochNum++;
                     totalEpochNum++;
 
-                    if (epochNum > 10000000) {
+                    if (epochNum > 10000) {
                         System.out.println("Exceeding max epoch nums");
-                        totalEpochNum -= 10000000;
+                        totalEpochNum -= 10000;
                         run--;
                         break;
                     }
-//                    writer.write(epochNum + "," + totalError + "\n");
-                    System.out.println("Total Error of Epoch " + epochNum + ": " + totalError);
+                    writer.write(epochNum + "," + totalError + "\n");
+                    //System.out.println("Total Error of Epoch " + epochNum + ": " + totalError);
                 }
-                //writer.write("Run " + run + " ended with " + epochNum + "\n");
+                // writer.write("Run " + run + " ended with " + epochNum + "\n");
                 System.out.println("Run " + run + " ended with " + epochNum);
 
-//                writer.close();
-//            } catch (UnsupportedEncodingException e) {
-//                e.printStackTrace();
-//                break;
-//            } catch (FileNotFoundException e) {
-//                e.printStackTrace();
-//                break;
-//            } catch (IOException e) {
-//                e.printStackTrace();
-//                break;
-//            }
-
+                writer.close();
+            } catch (UnsupportedEncodingException e) {
+                e.printStackTrace();
+                break;
+            } catch (FileNotFoundException e) {
+                e.printStackTrace();
+                break;
+            } catch (IOException e) {
+                e.printStackTrace();
+                break;
+            }
         }
-
         System.out.println("Avg epoch number needed to converge: " + totalEpochNum / runNum);
     }
 }
