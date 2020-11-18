@@ -17,20 +17,18 @@ import java.util.*;
  *      gunHeat : 2 states of heated, cooled
  *      enemyDistance : 3 states of close, median, far, separated by two thresholds
  *
- *      Total state space = 10x10x4x4x3x3x3x4x4 = 691,200
+ *      Total state space = 4x4x2x2x3 = 192
  *
  * Action Space
  *      fire
- *      moveForward
- *      moveBackward
- *      moveForwardTurnLeft
- *      moveForwardTurnRight
- *      moveBackwardTurnLeft
- *      moveBackwardTurnRight
+ *      Forward
+ *      Backward
+ *      ForwardAvoid
+ *      BackwardAvoid
  *
- *      Total action space = 7
+ *      Total action space = 5
  *
- * Total State-Action space = 4,838,400
+ * Total State-Action space = 960
  */
 
 public class QLearningRobot extends AdvancedRobot {

@@ -11,36 +11,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
-/**
- * This LUT class used for RL Q-value training. The output of this trained LUT can be
- * further used for neural net training.
- *
- * State Space:
- *      posX : 10 states from 0 to BattleFieldWidth
- *      posY : 10 states from 0 to BattleFieldHeight
- *      robotHeading : 4 states of East-North, North-West, West-South, South-East
- *      gunHeading : 4 states of East-North, North-West, West-South, South-East
- *      energy : 3 states of low, median, high
- *      gunHeat : 3 states of low, median, high
- *      velocity : 3 states of slow, median, fast
- *      enemyEnergy : 4 states of undefined, low, median, high
- *      enemyDistance : 4 states of undefined, close, median, far
- *
- *      Total state space = 10x10x4x4x3x3x3x4x4 = 691,200
- *
- * Action Space
- *      fire : rotate gun and fire a bullet with 3 levels of power correspondingly
- *              if no target is scanned, simply rotate the radar
- *      search : the radar to find a target
- *      chase : chase a target scanned (keep radar and gun direction & moving toward the target)
- *              if no target is scanned, simply rotate the radar
- *      retreat : similar to chase but only move to the opposite direction
- *      rotate : rotate around the enemy
- *
- *      Total action space = 7
- *
- * Total State-Action space = 4,838,400
- */
 public class RoboCodeLUT {
     public final static int lutDepth = QLearningRobot.stateNum;
     public final static int actionDim = QLearningRobot.actionNum;
