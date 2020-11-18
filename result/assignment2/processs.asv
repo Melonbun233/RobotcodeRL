@@ -1,0 +1,9 @@
+%% 2.a
+off_06 = csvread("result-0.6-offPolicy.txt");
+for i=1:99
+   figure();
+   plot(off_06(:,1), off_06(:,3));
+   xlabel("rounds");
+   ylabel("win rate");
+   title("Q
+end
