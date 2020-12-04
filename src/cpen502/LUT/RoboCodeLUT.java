@@ -3,9 +3,9 @@ package cpen502.LUT;
 import cpen502.robots.QLearningRobot;
 import cpen502.robots.QLearningRobot.StateCategory;
 import cpen502.robots.QLearningRobot.Action;
+import robocode.RobocodeFileOutputStream;
 
-import java.io.File;
-import java.io.IOException;
+import java.io.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -210,6 +210,26 @@ public class RoboCodeLUT {
      * @param argFile of type File.
      */
     public void save(File argFile) {
+        PrintStream ps = null;
+        try {
+            ps = new PrintStream(new RobocodeFileOutputStream(argFile));
+            for (int a = 0; a < posXDim; a ++) {
+                for (int b = 0; b < posYDim; b ++) {
+                    for (int c = 0; c < energyDim; c ++) {
+                        for (int d = 0; d < enemyDistanceDim; d ++) {
+                            for (int e = 0; e < gunHeatDim; e ++) {
+                                for (int f = 0; f < actionDim; f ++) {
+                                    ps.println(lut[a][b][c][d][e][f]);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            ps.close();
+        } catch (IOException ioException) {
+            ioException.printStackTrace();
+        }
         return;
     }
     /**
@@ -220,7 +240,29 @@ public class RoboCodeLUT {
      * the data in the file. (e.g. wrong number of hidden neurons).
      * @throws IOException
      */
-    public void load(String argFileName) throws IOException {
+    public void load(File argFile) {
+        BufferedReader reader = null;
+        try {
+            reader = new BufferedReader(new FileReader(argFile));
+            for (int a = 0; a < posXDim; a ++) {
+                for (int b = 0; b < posYDim; b ++) {
+                    for (int c = 0; c < energyDim; c ++) {
+                        for (int d = 0; d < enemyDistanceDim; d ++) {
+                            for (int e = 0; e < gunHeatDim; e ++) {
+                                for (int f = 0; f < actionDim; f ++) {
+                                    lut[a][b][c][d][e][f] = Double.parseDouble(reader.readLine());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            reader.close();
+        } catch (FileNotFoundException fileNotFoundException) {
+            fileNotFoundException.printStackTrace();
+        } catch (IOException ioException) {
+            ioException.printStackTrace();
+        }
         return;
     }
 }

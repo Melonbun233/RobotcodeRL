@@ -29,6 +29,12 @@ import java.util.*;
  *      Total action space = 5
  *
  * Total State-Action space = 960
+ *
+ * Input vector for Neural Network:
+ *            posX              posY     energy   gunHeat   EnemyDistance
+ *      | -1, -1, 1, -1 | -1, 1, -1, 1 | -1, 1  | -1, 1  |      1, -1, -1     |
+ *      We use bipolar one hot code encoding for the input
+ *      The output Q-value is also scaled to [-1, 1]
  */
 
 public class QLearningRobot extends AdvancedRobot {
@@ -114,7 +120,38 @@ public class QLearningRobot extends AdvancedRobot {
 
     double reward = 0;
 
+    static boolean saveFile = true;
+    static boolean loadFile = false;
+
+    public void run() {
+        setAdjustGunForRobotTurn(true);
+        setAdjustRadarForGunTurn(true);
+        setAdjustRadarForRobotTurn(true);
+        execute();
+
+        // read data from file
+        if (roundCount == 0 && loadFile) {
+            lut.load(getDataFile("LUT.txt"));
+        }
+
+        while (true) {
+            // reduce exploration rate by time
+            if (getRoundNum() - roundCount == 100) {
+                roundCount = getRoundNum();
+                explorationRate -= 0.01;
+                explorationRate = explorationRate < 0 ? 0 : explorationRate;
+                lut.setE(explorationRate);
+                winRates.add((double)winCount/100);
+                rounds.add(roundCount);
+                eRates.add(explorationRate);
+                winCount = 0;
+            }
+            turnRadarRight(360);
+        }
+    }
+
     public void onBattleEnded(BattleEndedEvent event) {
+        if (saveFile) lut.save(getDataFile("LUT.txt"));
         String policyString = useOffPolicy ? "offPolicy" : "onPolicy";
         PrintStream w = null;
         try {
@@ -137,28 +174,6 @@ public class QLearningRobot extends AdvancedRobot {
             if (w != null) {
                 w.close();
             }
-        }
-    }
-
-    public void run() {
-        setAdjustGunForRobotTurn(true);
-        setAdjustRadarForGunTurn(true);
-        setAdjustRadarForRobotTurn(true);
-        execute();
-
-        while (true) {
-            // reduce exploration rate by time
-            if (getRoundNum() - roundCount == 100) {
-                roundCount = getRoundNum();
-                explorationRate -= 0.01;
-                explorationRate = explorationRate < 0 ? 0 : explorationRate;
-                lut.setE(explorationRate);
-                winRates.add((double)winCount/100);
-                rounds.add(roundCount);
-                eRates.add(explorationRate);
-                winCount = 0;
-            }
-            turnRadarRight(360);
         }
     }
 
