@@ -1,7 +1,7 @@
 package cpen502.nerualnetwork;
 
-import java.io.File;
-import java.io.IOException;
+import javax.annotation.processing.Filer;
+import java.io.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
@@ -243,20 +243,58 @@ public class NeuralNetwork{
     }
 
 
-    /**
-     * Save the current configurations of this neural network.
-     * @param argFile of type File.
-     */
     public void save(File argFile) {
+        PrintStream ps = null;
+        try {
+            ps = new PrintStream((new FileOutputStream(argFile)));
+            for (int i = 0; i < weights.size(); i ++) {
+                for (int j = 0; j < weights.get(i).length; j ++) {
+                    for (int k = 0; k < weights.get(i)[j].length; k ++) {
+                        ps.println(weights.get(i)[j][k]);
+                        ps.println(weightDeltas.get(i)[j][k]);
+                        ps.println(weightCorrections.get(i)[j][k]);
+                    }
+                }
+            }
 
+            for (int i = 0; i < neuronOutputs.size(); i ++) {
+                for (int j = 0; j < neuronOutputs.get(i).length; j ++) {
+                    ps.println(neuronOutputs.get(i)[j]);
+                    ps.println(neuronDeltas.get(i)[j]);
+                }
+            }
+            ps.close();
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        }
     }
 
-    /**
-     * Reconstruct a neural network based on the states read from a file.
-     * @param argFileName
-     * @throws IOException
-     */
-    public void load(String argFileName) throws IOException {
+    public void load(File argFile)  {
+        BufferedReader reader = null;
+        try {
+            reader = new BufferedReader(new FileReader(argFile));
+            for (int i = 0; i < weights.size(); i ++) {
+                for (int j = 0; j < weights.get(i).length; j ++) {
+                    for (int k = 0; k < weights.get(i)[j].length; k ++) {
+                        weights.get(i)[j][k] = Double.parseDouble(reader.readLine());
+                        weightDeltas.get(i)[j][k] = Double.parseDouble(reader.readLine());
+                        weightCorrections.get(i)[j][k] = Double.parseDouble(reader.readLine());
+                    }
+                }
+            }
 
+            for (int i = 0; i < neuronOutputs.size(); i ++) {
+                for (int j = 0; j < neuronOutputs.get(i).length; j ++) {
+                    neuronOutputs.get(i)[j] = Double.parseDouble(reader.readLine());
+                    neuronDeltas.get(i)[j] = Double.parseDouble(reader.readLine());
+                }
+            }
+
+            reader.close();
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 }

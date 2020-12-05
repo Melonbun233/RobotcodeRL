@@ -76,7 +76,7 @@ public class RobocodeNN {
         Function<Double, Double> activationFunction = Functions.sigmoidBipolar;
         Function<Double, Double> activationDerivativeFunction = Functions.sigmoidDerivativeBipolar;
         int hiddenNeuronNum = 80;
-        double momentums = 0.8;
+        double momentums = 0.6;
         double learningRates = 0.01;
         int[] neuronNums = new int[] {20, hiddenNeuronNum, 1};
         NeuralNetwork neuralnet;
@@ -94,17 +94,27 @@ public class RobocodeNN {
         int maxEpochNum = 10000;
         double totalError;
 
+        boolean loadFile = true;
+        String loadFileName = "result/assignment3/NN.txt";
+        boolean saveFile = false;
+        String saveFileName = "result/assignment3/NN.txt";
+        boolean saveLog = false;
 
         for (int run = 0; run < runNum; run ++) {
             neuralnet.initializeWeights();
+            if (loadFile) neuralnet.load(new File(loadFileName));
             epochNum = 0;
             totalError = Double.POSITIVE_INFINITY;
 
-            Writer writer = new BufferedWriter(new OutputStreamWriter(
-                    new FileOutputStream("result/assignment3/NN-" + hiddenNeuronNum
-                    + "/" + momentums + "-" + learningRates + "-trial-" + run + ".txt"),
-                    "utf-8"
-            ));
+            Writer writer = null;
+            if (saveLog) {
+                writer = new BufferedWriter(new OutputStreamWriter(
+                        new FileOutputStream("result/assignment3/NN-" + hiddenNeuronNum
+                                + "/" + momentums + "-" + learningRates + "-trial-" + run + ".txt"),
+                        "utf-8"
+                ));
+            }
+
             while (epochNum < maxEpochNum) {
                 totalError = 0;
                 // Train 1 epoch
@@ -146,15 +156,15 @@ public class RobocodeNN {
 
                 epochNum ++;
                 totalEpochNum ++;
-                writer.write(epochNum + "," + totalError + "\n");
+                if (saveLog) writer.write(epochNum + "," + totalError + "\n");
                 System.out.println("Total Error of Epoch " + epochNum + ": " + totalError);
             }
 
             System.out.println("Run " + run + " ended with " + epochNum);
             System.out.println("Last error " + totalError);
-            writer.close();
+            if (saveLog) writer.close();
         }
-
+        if (saveFile) neuralnet.save(new File(saveFileName));
         System.out.println("Avg epoch number needed to converge: " + totalEpochNum / runNum);
     }
 
