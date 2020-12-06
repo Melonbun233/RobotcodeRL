@@ -1,15 +1,19 @@
 package cpen502.LUT;
 
+import cpen502.nerualnetwork.NeuralNetwork;
 import cpen502.robots.QLearningRobot;
 import cpen502.robots.QLearningRobot.StateCategory;
 import cpen502.robots.QLearningRobot.Action;
+import cpen502.utils.Functions;
 import robocode.RobocodeFileOutputStream;
+import robocode.*;
 
 import java.io.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.function.Function;
 
 public class RoboCodeLUT {
     public final static int lutDepth = QLearningRobot.stateNum;
@@ -28,6 +32,9 @@ public class RoboCodeLUT {
     private double e;     // exploration rate
     private boolean useOffPolicy;
 
+    private boolean useNN;
+    public NeuralNetwork neuralnet = null;
+
     private Random rand = new Random();
 
     double[][][][][][] lut = new double[posXDim][posYDim][energyDim]
@@ -36,13 +43,73 @@ public class RoboCodeLUT {
     int[][][][][][] access = new int[posXDim][posYDim][energyDim]
             [enemyDistanceDim][gunHeatDim][actionDim];
 
-    public RoboCodeLUT(double learningRate, double featureFactor, double explorationRate, boolean useOffPolicy) {
+    public RoboCodeLUT(double learningRate, double featureFactor, double explorationRate,
+                       boolean useOffPolicy, boolean useNN) {
         initialize();
         this.alpha = learningRate;
         this.gamma = featureFactor;
         this.e = explorationRate;
         this.useOffPolicy = useOffPolicy;
+        this.useNN = useNN;
+
+        if (useNN) {
+            Function<Double, Double> activationFunction = Functions.sigmoidBipolar;
+            Function<Double, Double> activationDerivativeFunction = Functions.sigmoidDerivativeBipolar;
+            int hiddenNeuronNum = 80;
+            double momentums = 0.6;
+            double learningRates = 0.01;
+            int[] neuronNums = new int[] {20, hiddenNeuronNum, 1};
+            try {
+                neuralnet = new NeuralNetwork(neuronNums, activationFunction,
+                        activationDerivativeFunction, momentums, learningRates);
+                neuralnet.initializeWeights();
+            } catch (Exception e) {
+                e.printStackTrace();
+                return;
+            }
+        }
     }
+
+    public Action updateValueNN(int[] curState, int[] prevState, Action prevAction, double reward) {
+        Action optimalAction = null;
+        double optimalQ = Double.NEGATIVE_INFINITY;
+        for (int i = 0; i < actionDim; i ++) {
+            double q = neuralnet.outputFor(SAToOneHot(curState, Action.values()[i]))[0];
+            if (q > optimalQ) {
+                optimalQ = q;
+                optimalAction = Action.values()[i];
+            }
+        }
+
+        boolean takeExploration = rand.nextDouble() <= e;
+        Action randomAction = null;
+        double randomQ = 0;
+        if (takeExploration) {
+            int actionIndex = rand.nextInt(actionDim);
+            randomAction = Action.values()[actionIndex];
+            randomQ = neuralnet.outputFor(SAToOneHot(curState, randomAction))[0];
+        }
+
+        if (prevState != null) {
+            double[] inputVector = SAToOneHot(prevState, prevAction);
+            double prevQ = neuralnet.outputFor(inputVector)[0];
+            double newQ;
+            if (useOffPolicy || !takeExploration) {
+                newQ = prevQ + alpha * (reward + gamma * optimalQ - prevQ);
+            } else {
+                newQ = prevQ + alpha * (reward + gamma * randomQ - prevQ);
+            }
+            neuralnet.train(inputVector, new double[]{newQ});
+        }
+
+        if (takeExploration) {
+            return randomAction;
+        } else {
+            return optimalAction;
+        }
+    }
+
+
 
 
     /**
@@ -110,6 +177,41 @@ public class RoboCodeLUT {
 //                }
             }
         }
+    }
+
+    private double[] SAToOneHot(int[] state, Action action) {
+        double[] oneHot = new double[20];
+        int ofs = 0;
+        for (int i = 0; i < posXDim; i ++) {
+            oneHot[i + ofs] = i == state[0] ? 1 : -1;
+        }
+        ofs += posXDim;
+
+        for (int i = 0; i < posYDim; i ++) {
+            oneHot[i + ofs] = i == state[1] ? 1 : -1;
+        }
+        ofs += posYDim;
+
+        for (int i = 0; i < energyDim; i ++) {
+            oneHot[i + ofs] = i == state[2] ? 1 : -1;
+        }
+        ofs += energyDim;
+
+        for (int i = 0; i < enemyDistanceDim; i ++) {
+            oneHot[i + ofs] = i == state[3] ? 1 : -1;
+        }
+        ofs += enemyDistanceDim;
+
+        for (int i = 0; i < gunHeatDim; i ++) {
+            oneHot[i + ofs] = i == state[4] ? 1 : -1;
+        }
+        ofs += gunHeatDim;
+
+        for (int i = 0; i < actionDim; i ++) {
+            oneHot[i + ofs] = i == action.getValue() ? 1 : -1;
+        }
+
+        return oneHot;
     }
 
     /**

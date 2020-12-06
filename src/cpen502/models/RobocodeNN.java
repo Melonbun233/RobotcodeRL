@@ -1,6 +1,5 @@
 package cpen502.models;
 
-import com.sun.tools.internal.ws.wsdl.document.Output;
 import cpen502.nerualnetwork.NeuralNetwork;
 import cpen502.robots.QLearningRobot;
 import cpen502.utils.Functions;
@@ -52,8 +51,8 @@ public class RobocodeNN {
         }
 
         // normalize training set output values
-        double maxQ = Double.MIN_VALUE;
-        double minQ = Double.MAX_VALUE;
+        double maxQ = Double.NEGATIVE_INFINITY;
+        double minQ = Double.POSITIVE_INFINITY;
         for (int a = 0; a < posXDim; a ++) {
             for (int b = 0; b < posYDim; b ++) {
                 for (int c = 0; c < energyDim; c ++) {
@@ -94,9 +93,9 @@ public class RobocodeNN {
         int maxEpochNum = 10000;
         double totalError;
 
-        boolean loadFile = true;
+        boolean loadFile = false;
         String loadFileName = "result/assignment3/NN.txt";
-        boolean saveFile = false;
+        boolean saveFile = true;
         String saveFileName = "result/assignment3/NN.txt";
         boolean saveLog = false;
 

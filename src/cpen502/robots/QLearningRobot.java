@@ -31,6 +31,7 @@ import java.util.*;
  * Total State-Action space = 960
  *
  * Input vector for Neural Network:
+ *      Here's an example of one input vector
  *            posX              posY     energy   gunHeat   EnemyDistance
  *      | -1, -1, 1, -1 | -1, 1, -1, 1 | -1, 1  | -1, 1  |      1, -1, -1     |
  *      We use bipolar one hot code encoding for the input
@@ -92,23 +93,27 @@ public class QLearningRobot extends AdvancedRobot {
 
     final boolean interReward = true;
     final double bulletHitBulletReward = -1;
-    final double bulletHitRobotReward = 1;
+    final double bulletHitRobotReward = 5;
     final double bulletHitWallReward = -1;
-    final double hitByBulletReward = -20;
-    final double hitByRobotReward = -10;
-    final double hitByWallReward = -20;
+    final double hitByBulletReward = -5;
+    final double hitByRobotReward = -5;
+    final double hitByWallReward = -10;
     final double deathReward = -50;
     final double winReward = 50;
     final double scanRobotReward = 0;
 
-    static double learningRate = 0.02;
-    static double featureFactor = 0.8;
-    static double explorationRate = 0;
+    static double learningRate = 0.001;
+    static double featureFactor = 0;
+    static double explorationRate = 0.5;
     static double initialERate = explorationRate;
     static boolean useOffPolicy = true;
+    static boolean useNN = true;
+    static boolean loadNNFile = false;
+    static boolean saveNNFile = false;
 
     final static RoboCodeLUT lut =
-            new RoboCodeLUT(learningRate, featureFactor, explorationRate, useOffPolicy);
+            new RoboCodeLUT(learningRate, featureFactor, explorationRate, useOffPolicy,
+                    useNN);
     int[] prevState = null;
     Action prevAction = null;
 
@@ -116,11 +121,14 @@ public class QLearningRobot extends AdvancedRobot {
     static List<Double> winRates = new ArrayList<>();
     static List<Double> eRates = new ArrayList<>();
     static List<Integer> rounds = new ArrayList<>();
+    static List<Double> rewards = new ArrayList<>();
+    static double sumReward = 0;
+    static int sumRewardCounter = 0;
     static int winCount = 0;
 
     double reward = 0;
 
-    static boolean saveFile = true;
+    static boolean saveFile = false;
     static boolean loadFile = false;
 
     public void run() {
@@ -132,6 +140,10 @@ public class QLearningRobot extends AdvancedRobot {
         // read data from file
         if (roundCount == 0 && loadFile) {
             lut.load(getDataFile("LUT.txt"));
+        }
+
+        if (roundCount == 0 && useNN && loadNNFile) {
+            lut.neuralnet.load(getDataFile("NN.txt"));
         }
 
         while (true) {
@@ -152,15 +164,27 @@ public class QLearningRobot extends AdvancedRobot {
 
     public void onBattleEnded(BattleEndedEvent event) {
         if (saveFile) lut.save(getDataFile("LUT.txt"));
+        if (saveNNFile) lut.neuralnet.save(getDataFile("NN.txt"));
+
         String policyString = useOffPolicy ? "offPolicy" : "onPolicy";
+        String NNString = useNN ? "NN-" : "";
         PrintStream w = null;
         try {
             out.println("Try writing result to: " + getDataDirectory());
 
             w = new PrintStream(new RobocodeFileOutputStream(
-                    getDataFile("./result-"+ initialERate + "-" + policyString +".txt")));
+                    getDataFile("./" + NNString + initialERate + "-" +
+                            featureFactor + "-" + policyString +".txt")));
             for (int i = 0; i < rounds.size(); i ++) {
                 w.println(rounds.get(i) + "," + eRates.get(i) + "," + winRates.get(i));
+            }
+
+            w = new PrintStream(new RobocodeFileOutputStream(
+                    getDataFile("./" + NNString + initialERate + "-" +
+                            featureFactor + "-" + policyString + "-rewards.txt")
+            ));
+            for (int i = 0; i < rewards.size(); i++) {
+                w.println(rewards.get(i));
             }
 
             if (w.checkError()) {
@@ -181,8 +205,18 @@ public class QLearningRobot extends AdvancedRobot {
 //        aimEnemy(event);
         if (interReward) reward += scanRobotReward;
         int[] state = evaluateState(event);
-        Action action = lut.updateValue(state, prevState, prevAction, reward);
+        Action action = useNN ? lut.updateValueNN(state, prevState, prevAction, reward) :
+                lut.updateValue(state, prevState, prevAction, reward);
         performAction(action, event);
+
+        if (sumRewardCounter < 200) {
+            sumReward += reward;
+            sumRewardCounter ++;
+        } else {
+            rewards.add(sumReward);
+            sumRewardCounter = 0;
+            sumReward = 0;
+        }
 
         reward = 0.0;
         prevState = state;
