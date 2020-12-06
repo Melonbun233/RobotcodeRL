@@ -103,17 +103,18 @@ public class QLearningRobot extends AdvancedRobot {
     final double scanRobotReward = 0;
 
     static double learningRate = 0.001;
-    static double featureFactor = 0;
+    static double featureFactor = 0.8;
     static double explorationRate = 0.5;
     static double initialERate = explorationRate;
     static boolean useOffPolicy = true;
     static boolean useNN = true;
+    static int lastNSize = 4;
     static boolean loadNNFile = false;
     static boolean saveNNFile = false;
 
     final static RoboCodeLUT lut =
             new RoboCodeLUT(learningRate, featureFactor, explorationRate, useOffPolicy,
-                    useNN);
+                    useNN, lastNSize);
     int[] prevState = null;
     Action prevAction = null;
 
@@ -174,14 +175,14 @@ public class QLearningRobot extends AdvancedRobot {
 
             w = new PrintStream(new RobocodeFileOutputStream(
                     getDataFile("./" + NNString + initialERate + "-" +
-                            featureFactor + "-" + policyString +".txt")));
+                            featureFactor + "-" + lastNSize + "-" + policyString +".txt")));
             for (int i = 0; i < rounds.size(); i ++) {
                 w.println(rounds.get(i) + "," + eRates.get(i) + "," + winRates.get(i));
             }
 
             w = new PrintStream(new RobocodeFileOutputStream(
                     getDataFile("./" + NNString + initialERate + "-" +
-                            featureFactor + "-" + policyString + "-rewards.txt")
+                            featureFactor + "-" + lastNSize + "-" + policyString + "-rewards.txt")
             ));
             for (int i = 0; i < rewards.size(); i++) {
                 w.println(rewards.get(i));

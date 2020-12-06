@@ -32,6 +32,14 @@ public class RoboCodeLUT {
     private double e;     // exploration rate
     private boolean useOffPolicy;
 
+    private int lastNSize;
+    private int lastNCount;
+    private int lastNHead;
+    private double[][] lastNInputVectors; // prev state and prev action
+    private int[][] lastNState; // cur state
+    private double[] lastNReward; // reward
+
+
     private boolean useNN;
     public NeuralNetwork neuralnet = null;
 
@@ -44,13 +52,14 @@ public class RoboCodeLUT {
             [enemyDistanceDim][gunHeatDim][actionDim];
 
     public RoboCodeLUT(double learningRate, double featureFactor, double explorationRate,
-                       boolean useOffPolicy, boolean useNN) {
+                       boolean useOffPolicy, boolean useNN, int lastNSize) {
         initialize();
         this.alpha = learningRate;
         this.gamma = featureFactor;
         this.e = explorationRate;
         this.useOffPolicy = useOffPolicy;
         this.useNN = useNN;
+        this.lastNSize = lastNSize;
 
         if (useNN) {
             Function<Double, Double> activationFunction = Functions.sigmoidBipolar;
@@ -67,6 +76,11 @@ public class RoboCodeLUT {
                 e.printStackTrace();
                 return;
             }
+            lastNInputVectors = new double[lastNSize][20];
+            lastNState = new int[lastNSize][5];
+            lastNReward = new double[lastNSize];
+            lastNHead = 0;
+            lastNCount = 0;
         }
     }
 
@@ -90,8 +104,9 @@ public class RoboCodeLUT {
             randomQ = neuralnet.outputFor(SAToOneHot(curState, randomAction))[0];
         }
 
+        double[] inputVector;
         if (prevState != null) {
-            double[] inputVector = SAToOneHot(prevState, prevAction);
+            inputVector = SAToOneHot(prevState, prevAction);
             double prevQ = neuralnet.outputFor(inputVector)[0];
             double newQ;
             if (useOffPolicy || !takeExploration) {
@@ -100,12 +115,65 @@ public class RoboCodeLUT {
                 newQ = prevQ + alpha * (reward + gamma * randomQ - prevQ);
             }
             neuralnet.train(inputVector, new double[]{newQ});
+
+
+            if (lastNSize > 0) {
+                trainLastN();
+                if (lastNCount == lastNSize) {
+                    // replace head with the new values and add 1 to head
+                    lastNInputVectors[lastNHead] = inputVector;
+                    lastNReward[lastNHead] = reward;
+                    lastNState[lastNHead] = curState;
+                    lastNHead = (lastNHead + 1) % lastNSize;
+                } else {
+                    // simply put the value to the tail
+                    lastNInputVectors[(lastNHead + lastNCount) % lastNSize] = inputVector;
+                    lastNReward[(lastNHead + lastNCount) % lastNSize] = reward;
+                    lastNState[(lastNHead + lastNCount) % lastNSize] = curState;
+                    lastNCount ++;
+                }
+            }
         }
 
         if (takeExploration) {
             return randomAction;
         } else {
             return optimalAction;
+        }
+    }
+
+    private void trainLastN() {
+        // train the last N vectors
+        for (int i = 0; i < lastNCount; i ++) {
+            double[] inputVector = lastNInputVectors[(lastNHead + i) % lastNSize];
+            int[] curState = lastNState[(lastNHead + i) % lastNSize];
+            double reward = lastNReward[(lastNHead + i) % lastNSize];
+
+            double optimalQ = Double.NEGATIVE_INFINITY;
+            for (int j = 0; j < actionDim; j ++) {
+                double q = neuralnet.outputFor(SAToOneHot(curState, Action.values()[j]))[0];
+                if (q > optimalQ) {
+                    optimalQ = q;
+                }
+            }
+
+            boolean takeExploration = rand.nextDouble() <= e;
+            Action randomAction = null;
+            double randomQ = 0;
+            if (takeExploration) {
+                int actionIndex = rand.nextInt(actionDim);
+                randomAction = Action.values()[actionIndex];
+                randomQ = neuralnet.outputFor(SAToOneHot(curState, randomAction))[0];
+            }
+
+            double prevQ = neuralnet.outputFor(inputVector)[0];
+            double newQ;
+            if (useOffPolicy || !takeExploration) {
+                newQ = prevQ + alpha * (reward + gamma * optimalQ - prevQ);
+            } else {
+                newQ = prevQ + alpha * (reward + gamma * randomQ - prevQ);
+            }
+            neuralnet.train(inputVector, new double[]{newQ});
         }
     }
 
